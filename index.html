@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ALP Instaladores</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          alp: {
+            dark: '#0F2A44',
+            primary: '#1E5BA8',
+            accent: '#F5B82E',
+            light: '#F4F7FB',
+            soft: '#E8EEF6',
+          }
+        },
+        fontFamily: {
+          sans: ['system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif']
+        }
+      }
+    }
+  }
+</script>
+<style>
+  html, body { background: #F4F7FB; }
+  .scroll-hide::-webkit-scrollbar { display: none; }
+  .check-anim { transition: all 0.2s ease; }
+  .check-anim:active { transform: scale(0.97); }
+  .fade-in { animation: fadeIn 0.25s ease; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(4px);} to { opacity: 1; transform: none;} }
+</style>
+</head>
+<body class="min-h-screen text-alp-dark">
+
+<!-- HEADER -->
+<header class="bg-alp-dark text-white sticky top-0 z-20 shadow-md">
+  <div class="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 rounded-lg bg-alp-accent flex items-center justify-center font-bold text-alp-dark text-lg">A</div>
+      <div>
+        <div class="font-bold leading-tight">ALP Instaladores</div>
+        <div class="text-xs text-alp-soft/80 leading-tight">Energía Solar</div>
+      </div>
+    </div>
+    <div class="text-right">
+      <div class="text-sm font-medium">Carlos Gómez</div>
+      <div class="text-xs text-alp-soft/70">Instalador · #INST-014</div>
+    </div>
+  </div>
+</header>
+
+<main id="app" class="max-w-3xl mx-auto px-4 py-5 pb-24"></main>
+
+<!-- FOOTER FIJO (volver) -->
+<footer id="footer-bar" class="hidden fixed bottom-0 inset-x-0 bg-white border-t border-alp-soft shadow-lg">
+  <div class="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
+    <button onclick="renderList()" class="flex-1 py-3 rounded-lg border border-alp-primary text-alp-primary font-medium hover:bg-alp-soft">← Volver a trabajos</button>
+    <button id="finalizar-btn" onclick="finalizarTrabajo()" class="flex-1 py-3 rounded-lg bg-alp-primary text-white font-medium hover:bg-alp-dark disabled:bg-gray-300 disabled:cursor-not-allowed">Finalizar trabajo</button>
+  </div>
+</footer>
+
+<script>
+/* =========================================================
+   DATOS SIMULADOS
+   ========================================================= */
+const CHECKLIST_TEMPLATE = [
+  { id: 1, titulo: "Verificación de seguridad y EPP", detalle: "Confirmar uso de casco, arnés, calzado dieléctrico y guantes. Revisar perímetro de trabajo." },
+  { id: 2, titulo: "Inspección del techo y estructura", detalle: "Verificar estado de cubierta, orientación, sombras y resistencia estructural." },
+  { id: 3, titulo: "Marcado y medición de puntos de fijación", detalle: "Marcar según plano de montaje aprobado. Verificar separaciones mínimas." },
+  { id: 4, titulo: "Instalación de estructura de soporte", detalle: "Fijar perfiles de aluminio y grampas. Aplicar sellador en cada perforación." },
+  { id: 5, titulo: "Montaje de paneles solares", detalle: "Colocar paneles respetando orientación e inclinación del proyecto." },
+  { id: 6, titulo: "Conexionado eléctrico DC (string)", detalle: "Conexión serie/paralelo según diagrama. Verificar polaridad antes de energizar." },
+  { id: 7, titulo: "Instalación del inversor", detalle: "Fijar a pared ventilada. Respetar distancias mínimas indicadas por fabricante." },
+  { id: 8, titulo: "Conexión a tablero eléctrico", detalle: "Instalar protecciones AC y vincular con tablero general de la vivienda." },
+  { id: 9, titulo: "Puesta a tierra del sistema", detalle: "Conectar estructura, paneles e inversor a la malla de PAT existente." },
+  { id: 10, titulo: "Pruebas y mediciones", detalle: "Medir tensión DC y AC, aislación, secuencia de fases. Registrar valores." },
+  { id: 11, titulo: "Configuración de monitoreo", detalle: "Vincular inversor al WiFi del cliente y dejar app de monitoreo configurada." },
+  { id: 12, titulo: "Limpieza y entrega al cliente", detalle: "Retirar materiales sobrantes y explicar funcionamiento al usuario final." },
+];
+
+const MATERIALES_DISPONIBLES = [
+  { codigo: "PNL-450", nombre: "Panel solar monocristalino 450W", unidad: "u" },
+  { codigo: "INV-5K", nombre: "Inversor on-grid 5kW", unidad: "u" },
+  { codigo: "MCRINV", nombre: "Microinversor 350W", unidad: "u" },
+  { codigo: "PERF-AL", nombre: "Perfil de aluminio 4.2m", unidad: "u" },
+  { codigo: "GRAMPA-M", nombre: "Grampa media de fijación", unidad: "u" },
+  { codigo: "GRAMPA-T", nombre: "Grampa terminal de fijación", unidad: "u" },
+  { codigo: "CBL-6", nombre: "Cable solar 6mm² (rojo/negro)", unidad: "m" },
+  { codigo: "MC4", nombre: "Conector MC4 (par macho/hembra)", unidad: "u" },
+  { codigo: "TBL-DC", nombre: "Tablero de protección DC", unidad: "u" },
+  { codigo: "DPS", nombre: "Descargador de sobretensión", unidad: "u" },
+  { codigo: "CBL-PAT", nombre: "Cable de puesta a tierra 6mm²", unidad: "m" },
+  { codigo: "TRN-INX", nombre: "Tornillería inoxidable (bolsa)", unidad: "bolsa" },
+  { codigo: "SLD", nombre: "Sellador estructural", unidad: "cartucho" },
+];
+
+let TRABAJOS = [
+  {
+    id: "T-1042",
+    cliente: "Familia Pérez",
+    direccion: "Av. Centenario 2450, San Isidro",
+    tipo: "Residencial · 6 paneles · 2.7 kW",
+    fecha: "15/05/2026",
+    estado: "pendiente",      // pendiente | en_curso | finalizado
+    checklist: clonarChecklist(),
+    materiales: [],
+  },
+  {
+    id: "T-1043",
+    cliente: "Local El Sol",
+    direccion: "Av. del Libertador 3120, Vicente López",
+    tipo: "Comercial · 12 paneles · 5.4 kW",
+    fecha: "15/05/2026",
+    estado: "en_curso",
+    checklist: clonarChecklist([1,2,3,4]),
+    materiales: [
+      { codigo: "PNL-450", nombre: "Panel solar monocristalino 450W", unidad: "u", cantidad: 12 },
+      { codigo: "PERF-AL", nombre: "Perfil de aluminio 4.2m", unidad: "u", cantidad: 8 },
+      { codigo: "GRAMPA-M", nombre: "Grampa media de fijación", unidad: "u", cantidad: 32 },
+    ],
+  },
+  {
+    id: "T-1044",
+    cliente: "Familia Martínez",
+    direccion: "Roca 1280, Olivos",
+    tipo: "Residencial · 4 paneles · 1.8 kW",
+    fecha: "16/05/2026",
+    estado: "pendiente",
+    checklist: clonarChecklist(),
+    materiales: [],
+  },
+];
+
+function clonarChecklist(idsHechos = []) {
+  return CHECKLIST_TEMPLATE.map(t => ({ ...t, hecho: idsHechos.includes(t.id) }));
+}
+
+/* =========================================================
+   PERSISTENCIA LOCAL (para que la demo recuerde cambios)
+   ========================================================= */
+const STORE_KEY = "alp_demo_trabajos_v1";
+function guardar() { localStorage.setItem(STORE_KEY, JSON.stringify(TRABAJOS)); }
+function cargar() {
+  const raw = localStorage.getItem(STORE_KEY);
+  if (raw) { try { TRABAJOS = JSON.parse(raw); } catch(e){} }
+}
+
+/* =========================================================
+   ESTADO DE LA VISTA
+   ========================================================= */
+let trabajoActualId = null;
+let tabActual = "checklist"; // checklist | materiales
+
+/* =========================================================
+   HELPERS
+   ========================================================= */
+function estadoBadge(estado) {
+  const map = {
+    pendiente:   { label: "Pendiente",  cls: "bg-gray-200 text-gray-700" },
+    en_curso:    { label: "En curso",   cls: "bg-amber-100 text-amber-800" },
+    finalizado:  { label: "Finalizado", cls: "bg-emerald-100 text-emerald-800" },
+  };
+  const m = map[estado] || map.pendiente;
+  return `<span class="text-xs font-medium px-2 py-1 rounded-full ${m.cls}">${m.label}</span>`;
+}
+
+function progresoTrabajo(t) {
+  const total = t.checklist.length;
+  const hechos = t.checklist.filter(x => x.hecho).length;
+  return { hechos, total, pct: Math.round((hechos/total)*100) };
+}
+
+function showFooter(show) {
+  document.getElementById("footer-bar").classList.toggle("hidden", !show);
+}
+
+/* =========================================================
+   VISTA 1: LISTA DE TRABAJOS
+   ========================================================= */
+function renderList() {
+  trabajoActualId = null;
+  showFooter(false);
+  const pendientes = TRABAJOS.filter(t => t.estado !== "finalizado").length;
+  const finalizados = TRABAJOS.filter(t => t.estado === "finalizado").length;
+
+  const html = `
+    <section class="fade-in">
+      <div class="mb-5">
+        <h1 class="text-2xl font-bold">Trabajos asignados</h1>
+        <p class="text-sm text-gray-500">Hoy tenés ${pendientes} trabajo${pendientes!==1?'s':''} pendiente${pendientes!==1?'s':''} · ${finalizados} finalizado${finalizados!==1?'s':''}</p>
+      </div>
+
+      <div class="space-y-3">
+        ${TRABAJOS.map(t => {
+          const p = progresoTrabajo(t);
+          return `
+          <button onclick="renderDetalle('${t.id}')" class="check-anim w-full text-left bg-white rounded-xl p-4 shadow-sm hover:shadow-md border border-transparent hover:border-alp-primary/30 block">
+            <div class="flex items-start justify-between gap-3">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 mb-1">
+                  <span class="text-xs font-mono text-gray-400">${t.id}</span>
+                  ${estadoBadge(t.estado)}
+                </div>
+                <div class="font-semibold truncate">${t.cliente}</div>
+                <div class="text-sm text-gray-600 truncate">${t.direccion}</div>
+                <div class="text-xs text-gray-500 mt-1">${t.tipo}</div>
+              </div>
+              <div class="text-right shrink-0">
+                <div class="text-xs text-gray-400">Fecha</div>
+                <div class="text-sm font-medium">${t.fecha}</div>
+              </div>
+            </div>
+            <div class="mt-3">
+              <div class="flex items-center justify-between text-xs text-gray-500 mb-1">
+                <span>Progreso de tareas</span>
+                <span>${p.hechos}/${p.total}</span>
+              </div>
+              <div class="h-2 bg-alp-soft rounded-full overflow-hidden">
+                <div class="h-full bg-alp-primary" style="width:${p.pct}%"></div>
+              </div>
+            </div>
+          </button>
+          `;
+        }).join("")}
+      </div>
+
+      <div class="mt-8 bg-white rounded-xl p-4 border border-alp-soft">
+        <div class="text-xs uppercase tracking-wide text-gray-400 font-semibold mb-2">Resumen del día</div>
+        <div class="grid grid-cols-3 gap-3 text-center">
+          <div><div class="text-2xl font-bold text-alp-primary">${TRABAJOS.length}</div><div class="text-xs text-gray-500">Asignados</div></div>
+          <div><div class="text-2xl font-bold text-amber-600">${TRABAJOS.filter(t=>t.estado==='en_curso').length}</div><div class="text-xs text-gray-500">En curso</div></div>
+          <div><div class="text-2xl font-bold text-emerald-600">${finalizados}</div><div class="text-xs text-gray-500">Finalizados</div></div>
+        </div>
+      </div>
+    </section>
+  `;
+  document.getElementById("app").innerHTML = html;
+  window.scrollTo({ top: 0, behavior: "instant" });
+}
+
+/* =========================================================
+   VISTA 2: DETALLE DE TRABAJO
+   ========================================================= */
+function renderDetalle(id) {
+  trabajoActualId = id;
+  tabActual = "checklist";
+  // marcar en curso si estaba pendiente
+  const t = TRABAJOS.find(x => x.id === id);
+  if (t && t.estado === "pendiente") { t.estado = "en_curso"; guardar(); }
+  pintarDetalle();
+  showFooter(true);
+}
+
+function pintarDetalle() {
+  const t = TRABAJOS.find(x => x.id === trabajoActualId);
+  if (!t) return renderList();
+  const p = progresoTrabajo(t);
+  const todoListo = p.hechos === p.total;
+
+  document.getElementById("finalizar-btn").disabled = !todoListo;
+  document.getElementById("finalizar-btn").textContent =
+    t.estado === "finalizado" ? "Trabajo finalizado ✓" :
+    todoListo ? "Finalizar trabajo" : `Faltan ${p.total - p.hechos} tarea${p.total-p.hechos!==1?'s':''}`;
+
+  const html = `
+    <section class="fade-in">
+      <!-- ficha cliente -->
+      <div class="bg-white rounded-xl p-4 shadow-sm mb-4">
+        <div class="flex items-start justify-between gap-3 mb-2">
+          <div>
+            <div class="text-xs font-mono text-gray-400">${t.id}</div>
+            <h2 class="text-xl font-bold">${t.cliente}</h2>
+          </div>
+          ${estadoBadge(t.estado)}
+        </div>
+        <div class="text-sm text-gray-700">📍 ${t.direccion}</div>
+        <div class="text-sm text-gray-500 mt-1">⚡ ${t.tipo}</div>
+        <div class="text-sm text-gray-500">📅 ${t.fecha}</div>
+
+        <div class="mt-3">
+          <div class="flex items-center justify-between text-xs text-gray-500 mb-1">
+            <span>Avance de tareas</span>
+            <span>${p.hechos}/${p.total} (${p.pct}%)</span>
+          </div>
+          <div class="h-2 bg-alp-soft rounded-full overflow-hidden">
+            <div class="h-full bg-alp-primary transition-all" style="width:${p.pct}%"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- tabs -->
+      <div class="flex gap-2 mb-4">
+        <button onclick="cambiarTab('checklist')" class="flex-1 py-2.5 rounded-lg font-medium text-sm border ${tabActual==='checklist'?'bg-alp-primary text-white border-alp-primary':'bg-white text-alp-dark border-alp-soft'}">
+          ✓ Checklist
+        </button>
+        <button onclick="cambiarTab('materiales')" class="flex-1 py-2.5 rounded-lg font-medium text-sm border ${tabActual==='materiales'?'bg-alp-primary text-white border-alp-primary':'bg-white text-alp-dark border-alp-soft'}">
+          📦 Materiales (${t.materiales.length})
+        </button>
+      </div>
+
+      <div id="tab-content">
+        ${tabActual === 'checklist' ? renderChecklist(t) : renderMateriales(t)}
+      </div>
+    </section>
+  `;
+  document.getElementById("app").innerHTML = html;
+}
+
+/* ---- TAB CHECKLIST ---- */
+function renderChecklist(t) {
+  return `
+    <div class="space-y-2">
+      ${t.checklist.map((item, idx) => `
+        <label class="check-anim flex gap-3 items-start bg-white rounded-xl p-4 shadow-sm cursor-pointer ${item.hecho?'opacity-70':''}">
+          <input type="checkbox" ${item.hecho?'checked':''} onchange="toggleTarea(${item.id})" class="mt-1 w-5 h-5 accent-alp-primary cursor-pointer">
+          <div class="flex-1">
+            <div class="flex items-center gap-2 mb-0.5">
+              <span class="text-xs font-mono text-gray-400">Paso ${idx+1}</span>
+            </div>
+            <div class="font-medium ${item.hecho?'line-through text-gray-500':''}">${item.titulo}</div>
+            <div class="text-sm text-gray-500 mt-0.5">${item.detalle}</div>
+          </div>
+        </label>
+      `).join("")}
+    </div>
+  `;
+}
+
+function toggleTarea(tareaId) {
+  const t = TRABAJOS.find(x => x.id === trabajoActualId);
+  const tarea = t.checklist.find(x => x.id === tareaId);
+  tarea.hecho = !tarea.hecho;
+  guardar();
+  pintarDetalle();
+}
+
+function cambiarTab(tab) {
+  tabActual = tab;
+  pintarDetalle();
+}
+
+/* ---- TAB MATERIALES ---- */
+function renderMateriales(t) {
+  return `
+    <div class="space-y-3">
+      <!-- formulario de carga -->
+      <div class="bg-white rounded-xl p-4 shadow-sm">
+        <div class="text-sm font-semibold mb-3">Cargar material usado</div>
+        <div class="grid grid-cols-1 sm:grid-cols-[1fr_120px_auto] gap-2">
+          <select id="mat-select" class="border border-alp-soft rounded-lg px-3 py-2.5 bg-alp-light focus:outline-none focus:ring-2 focus:ring-alp-primary">
+            <option value="">Elegí un material…</option>
+            ${MATERIALES_DISPONIBLES.map(m => `<option value="${m.codigo}">${m.nombre}</option>`).join("")}
+          </select>
+          <input id="mat-cant" type="number" min="0" step="0.5" placeholder="Cantidad" class="border border-alp-soft rounded-lg px-3 py-2.5 bg-alp-light focus:outline-none focus:ring-2 focus:ring-alp-primary" />
+          <button onclick="agregarMaterial()" class="bg-alp-primary text-white px-4 py-2.5 rounded-lg font-medium hover:bg-alp-dark">+ Agregar</button>
+        </div>
+      </div>
+
+      <!-- listado de materiales cargados -->
+      ${t.materiales.length === 0 ? `
+        <div class="bg-white rounded-xl p-6 text-center text-gray-500 text-sm shadow-sm">
+          Todavía no cargaste materiales para este trabajo.
+        </div>
+      ` : `
+        <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+          <div class="px-4 py-2 text-xs uppercase tracking-wide text-gray-400 font-semibold border-b border-alp-soft">Materiales cargados</div>
+          <ul class="divide-y divide-alp-soft">
+            ${t.materiales.map((m, i) => `
+              <li class="flex items-center justify-between gap-3 px-4 py-3">
+                <div class="min-w-0">
+                  <div class="font-medium truncate">${m.nombre}</div>
+                  <div class="text-xs text-gray-400 font-mono">${m.codigo}</div>
+                </div>
+                <div class="flex items-center gap-3 shrink-0">
+                  <div class="text-sm font-semibold">${m.cantidad} ${m.unidad}</div>
+                  <button onclick="quitarMaterial(${i})" title="Quitar" class="text-gray-400 hover:text-red-500 text-lg leading-none">×</button>
+                </div>
+              </li>
+            `).join("")}
+          </ul>
+        </div>
+      `}
+    </div>
+  `;
+}
+
+function agregarMaterial() {
+  const codigo = document.getElementById("mat-select").value;
+  const cant = parseFloat(document.getElementById("mat-cant").value);
+  if (!codigo) { alert("Elegí un material."); return; }
+  if (!cant || cant <= 0) { alert("Ingresá una cantidad válida."); return; }
+
+  const t = TRABAJOS.find(x => x.id === trabajoActualId);
+  const def = MATERIALES_DISPONIBLES.find(m => m.codigo === codigo);
+  // si ya existe, sumo cantidad
+  const existente = t.materiales.find(m => m.codigo === codigo);
+  if (existente) existente.cantidad += cant;
+  else t.materiales.push({ ...def, cantidad: cant });
+  guardar();
+  pintarDetalle();
+}
+
+function quitarMaterial(idx) {
+  const t = TRABAJOS.find(x => x.id === trabajoActualId);
+  t.materiales.splice(idx, 1);
+  guardar();
+  pintarDetalle();
+}
+
+/* ---- FINALIZAR ---- */
+function finalizarTrabajo() {
+  const t = TRABAJOS.find(x => x.id === trabajoActualId);
+  if (!t) return;
+  const p = progresoTrabajo(t);
+  if (p.hechos !== p.total) return;
+  if (t.materiales.length === 0) {
+    if (!confirm("No cargaste materiales para este trabajo. ¿Querés finalizar igual?")) return;
+  }
+  t.estado = "finalizado";
+  guardar();
+  alert(`✓ Trabajo ${t.id} finalizado.\n\nEstos datos quedan registrados para ALP:\n• ${p.total} tareas completadas\n• ${t.materiales.length} materiales cargados\n\n(En la versión real se enviarían al sistema de ALP para generar estadísticas)`);
+  renderList();
+}
+
+/* =========================================================
+   BOOT
+   ========================================================= */
+cargar();
+renderList();
+
+// botón en consola para resetear la demo
+window.resetDemo = function() { localStorage.removeItem(STORE_KEY); location.reload(); };
+</script>
+
+</body>
+</html>
